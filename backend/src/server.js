@@ -24,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.WEB_UI_PORT || 8080;
 const EVILGINX_BIN = process.env.EVILGINX_BIN || '/app/evilginx';
 const PHISHLETS_DIR = process.env.PHISHLETS_DIR || '/app/phishlets';
+const EVILGINX_CONFIG_DIR = process.env.EVILGINX_CONFIG_DIR || '/home/evilginx/.evilginx';
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -56,7 +57,11 @@ attachConsoleWs(server);
 attachLogsWs(server);
 attachGophishLogsWs(server);
 
-evilginx.start(EVILGINX_BIN, ['-p', PHISHLETS_DIR], {
+// -c is explicit rather than left to evilginx's own default (user.Current().HomeDir + "/.evilginx")
+// so its config/db/blacklist location can't drift out from under the web console's file-editing
+// features depending on which OS user the process happens to run as (e.g. root's default is /root,
+// not /home/evilginx).
+evilginx.start(EVILGINX_BIN, ['-p', PHISHLETS_DIR, '-c', EVILGINX_CONFIG_DIR], {
   cwd: '/app',
   env: process.env,
 });
