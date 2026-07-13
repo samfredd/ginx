@@ -14,6 +14,7 @@ import Blacklist from './pages/Blacklist.jsx';
 import LiveLogs from './pages/LiveLogs.jsx';
 import CommandReference from './pages/CommandReference.jsx';
 import Gophish from './pages/Gophish.jsx';
+import Notifications from './pages/Notifications.jsx';
 
 function RestartButton() {
   const [busy, setBusy] = useState(false);
@@ -80,6 +81,7 @@ export default function App() {
         <NavLink to="/phishlets/new">Phishlet Builder</NavLink>
         <NavLink to="/lures">Lures</NavLink>
         <NavLink to="/sessions">Sessions</NavLink>
+        <NavLink to="/notifications">Notifications</NavLink>
         <NavLink to="/blacklist">Blacklist</NavLink>
         <NavLink to="/files">File Editor</NavLink>
         <NavLink to="/config">Config</NavLink>
@@ -97,6 +99,7 @@ export default function App() {
           <Route path="/phishlets/:name" element={<PhishletEditor />} />
           <Route path="/lures" element={<Lures />} />
           <Route path="/sessions" element={<Sessions />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/blacklist" element={<Blacklist />} />
           <Route path="/files" element={<FileEditor />} />
           <Route path="/config" element={<ConfigPage />} />

