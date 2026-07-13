@@ -29,10 +29,14 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Then open **http://127.0.0.1:8080** and sign in with `WEB_UI_PASSWORD`. The
-web UI port is bound to `127.0.0.1` only by default (not exposed on your LAN)
-— edit the port mapping in `docker-compose.yml` if you need remote access, and
-put it behind a reverse proxy / VPN rather than exposing it directly.
+Then open **http://<host>:8080** and sign in with `WEB_UI_PASSWORD`. This port
+(and Gophish's `3333`) are published on all interfaces, i.e. reachable from
+the internet on a VPS — this has full control over your phishing
+infrastructure, so **make sure `WEB_UI_PASSWORD` is long and random, not left
+at a default/example value**, before you expose it. If you'd rather not put
+it on the open internet at all, bind it to `127.0.0.1` in `docker-compose.yml`
+instead (`"127.0.0.1:8080:8080/tcp"`) and reach it over an SSH tunnel — see
+[Fresh-machine setup](#fresh-machine-setup) for that command.
 
 The full Evilginx console is also still available directly:
 
@@ -165,21 +169,33 @@ cd ginx
 
 It installs Docker if missing (via Docker's official convenience script),
 installs and configures `ufw` on Linux (allows SSH, 80/tcp, 443/tcp, 53/udp,
-then enables it — pass `--no-firewall` to skip this if you manage firewall
-rules elsewhere, e.g. a cloud provider's security group), generates `.env`
-with a random `WEB_UI_PASSWORD` if one doesn't already exist, then runs
-`docker compose up -d --build` and prints the access URL and password (both
-Evilginx and Gophish). Safe to re-run — it won't overwrite an existing `.env`
-or touch containers beyond rebuilding/restarting them.
+8080/tcp, 3333/tcp, then enables it — pass `--no-firewall` to skip this if
+you manage firewall rules elsewhere, e.g. a cloud provider's security group),
+generates `.env` with a random `WEB_UI_PASSWORD` if one doesn't already
+exist, then runs `docker compose up -d --build` and prints the access URL
+and password (both Evilginx and Gophish). Safe to re-run — it won't
+overwrite an existing `.env` or touch containers beyond rebuilding/restarting
+them.
 
-The web console and Gophish admin ports are bound to `127.0.0.1` only — reach
-them from your own machine via an SSH tunnel:
+**8080 and 3333 are published on the public IP by default** — see the
+warning under [Build & run](#build--run) about setting a real
+`WEB_UI_PASSWORD` before you rely on that. If you'd rather they not be
+reachable from the internet at all, bind them to `127.0.0.1` in
+`docker-compose.yml` instead:
+
+```yaml
+    ports:
+      - "127.0.0.1:8080:8080/tcp"   # evilginx service
+      - "127.0.0.1:3333:3333/tcp"   # gophish service
+```
+
+then reach them from your own machine over an SSH tunnel:
 
 ```bash
 ssh -L 8080:127.0.0.1:8080 -L 3333:127.0.0.1:3333 youruser@your-vps-ip
 ```
 
-then browse to http://127.0.0.1:8080 and https://127.0.0.1:3333 as usual.
+and browse to http://127.0.0.1:8080 and https://127.0.0.1:3333 as usual.
 
 ## Notes
 

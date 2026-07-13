@@ -6,7 +6,7 @@ services:
       - "443:443/tcp"
       - "80:80/tcp"
       - "53:53/udp"
-      - "127.0.0.1:8080:8080/tcp"
+      - "8080:8080/tcp"
     environment:
       - WEB_UI_PASSWORD=${WEB_UI_PASSWORD:?set WEB_UI_PASSWORD in a .env file or the environment}
       - DEBUG_EVILGINX_PTY=${DEBUG_EVILGINX_PTY:-}
@@ -34,7 +34,7 @@ services:
       dockerfile: Dockerfile.gophish
     container_name: gophish
     ports:
-      - "127.0.0.1:3333:3333/tcp"
+      - "3333:3333/tcp"
     volumes:
       - gophish-data:/data
     restart: unless-stopped

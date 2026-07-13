@@ -104,7 +104,7 @@ setup_firewall() {
     fi
   fi
 
-  log "Configuring firewall (ufw): SSH, 80/tcp, 443/tcp, 53/udp"
+  log "Configuring firewall (ufw): SSH, 80/tcp, 443/tcp, 53/udp, 8080/tcp, 3333/tcp"
   # SSH first, always — enabling ufw before this rule exists can lock you
   # out of the very box you're running this script on. Falls back to the
   # raw port in case the 'OpenSSH' app profile isn't registered (happens on
@@ -113,6 +113,12 @@ setup_firewall() {
   $SUDO ufw allow 80/tcp
   $SUDO ufw allow 443/tcp
   $SUDO ufw allow 53/udp   # only needed if evilginx is your domain's authoritative nameserver; harmless otherwise
+  # 8080 (web console) and 3333 (gophish admin) are published on all
+  # interfaces by default in docker-compose.yml — see the README for how to
+  # bind them to 127.0.0.1 instead if you'd rather reach them over an SSH
+  # tunnel and not open them here.
+  $SUDO ufw allow 8080/tcp
+  $SUDO ufw allow 3333/tcp
   $SUDO ufw --force enable
   $SUDO ufw status
 }
