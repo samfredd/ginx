@@ -1,0 +1,54 @@
+FROM golang:1.22-bookworm AS builder
+
+ARG GOPHISH_VERSION=v0.12.1
+WORKDIR /build
+
+# go-sqlite3 is cgo — needs an actual C compiler at build time.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${GOPHISH_VERSION} https://github.com/gophish/gophish.git . \
+    || git clone --depth 1 https://github.com/gophish/gophish.git .
+
+ENV CGO_ENABLED=1
+RUN go build -o /build/gophish .
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -d /home/gophish -s /bin/bash gophish
+
+WORKDIR /app
+
+COPY --from=builder /build/gophish /app/gophish
+COPY --from=builder /build/VERSION /app/VERSION
+COPY --from=builder /build/templates /app/templates
+COPY --from=builder /build/static /app/static
+COPY --from=builder /build/db /app/db
+
+# Mutable state (db, self-signed admin cert, logs, and config.json — the web
+# console edits that last one) lives under /data, a separate mount point.
+# Keeping it out of /app avoids the classic Docker footgun where a volume
+# mounted directly over a directory the image ships files into either
+# shadows those files, or (on first run) freezes them at whatever the image
+# had when the volume was created, silently ignoring updates from later
+# image rebuilds. config.json.default is copied to /data/config.json by the
+# entrypoint on first boot (see gophish-entrypoint.sh) rather than relying
+# on Docker's empty-volume seeding, which wouldn't help anyone upgrading a
+# gophish-data volume that predates this file.
+COPY gophish-config.json /app/config.json.default
+COPY gophish-entrypoint.sh /app/docker-entrypoint.sh
+
+RUN mkdir -p /data \
+    && chmod +x /app/docker-entrypoint.sh \
+    && chown -R gophish:gophish /app /data
+
+USER gophish
+VOLUME /data
+
+# Admin UI on 3333 (published to the host); phish_server on 8080 is unused
+# here — evilginx serves the actual phishing pages — and is not published.
+EXPOSE 3333/tcp 8080/tcp
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

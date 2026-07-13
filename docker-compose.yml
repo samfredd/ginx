@@ -1,0 +1,46 @@
+services:
+  evilginx:
+    build: .
+    container_name: evilginx
+    ports:
+      - "443:443/tcp"
+      - "80:80/tcp"
+      - "53:53/udp"
+      - "127.0.0.1:8080:8080/tcp"
+    environment:
+      - WEB_UI_PASSWORD=${WEB_UI_PASSWORD:?set WEB_UI_PASSWORD in a .env file or the environment}
+      - DEBUG_EVILGINX_PTY=${DEBUG_EVILGINX_PTY:-}
+      - GOPHISH_CONTAINER_NAME=gophish
+      - GOPHISH_LOG_PATH=/gophish-data/gophish.log
+      - GOPHISH_DATA_DIR=/gophish-data
+    volumes:
+      - evilginx-data:/home/evilginx/.evilginx
+      - evilginx-phishlets:/app/phishlets
+      - evilginx-redirectors:/app/redirectors
+      - gophish-data:/gophish-data
+      # Grants the web console root-equivalent access to the Docker host so
+      # it can restart the gophish container and isn't just a convenience —
+      # see the README section on the Gophish integration for the tradeoff.
+      - /var/run/docker.sock:/var/run/docker.sock
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    depends_on:
+      - gophish
+
+  gophish:
+    build:
+      context: .
+      dockerfile: Dockerfile.gophish
+    container_name: gophish
+    ports:
+      - "127.0.0.1:3333:3333/tcp"
+    volumes:
+      - gophish-data:/data
+    restart: unless-stopped
+
+volumes:
+  evilginx-data:
+  evilginx-phishlets:
+  evilginx-redirectors:
+  gophish-data:
