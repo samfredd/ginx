@@ -28,8 +28,35 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 install_docker_linux() {
-  log "Docker not found — installing via Docker's official convenience script"
-  curl -fsSL https://get.docker.com | $SUDO sh
+  if command -v apt-get >/dev/null 2>&1 && [ -f /etc/os-release ]; then
+    # Docker's get.docker.com convenience script always installs a fixed,
+    # ever-growing package list (it currently includes docker-model-plugin),
+    # and that package isn't published for every distro codename — it fails
+    # outright on older/EOL releases (e.g. Ubuntu Focal) even though the
+    # packages this project actually needs are available fine. Install just
+    # those directly instead, following Docker's own manual apt instructions.
+    log "Docker not found — installing via apt (Docker's official repo)"
+    . /etc/os-release
+    DISTRO_ID="$ID"
+    CODENAME="${VERSION_CODENAME:-$(command -v lsb_release >/dev/null 2>&1 && lsb_release -cs || echo "")}"
+    if [ -z "$CODENAME" ]; then
+      die "Could not determine distro codename from /etc/os-release. Install Docker manually: https://docs.docker.com/engine/install/"
+    fi
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq ca-certificates curl
+    $SUDO install -m 0755 -d /etc/apt/keyrings
+    $SUDO curl -fsSL "https://download.docker.com/linux/${DISTRO_ID}/gpg" -o /etc/apt/keyrings/docker.asc
+    $SUDO chmod a+r /etc/apt/keyrings/docker.asc
+    ARCH=$(dpkg --print-architecture)
+    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${DISTRO_ID} ${CODENAME} stable" \
+      | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  else
+    log "Docker not found — installing via Docker's official convenience script"
+    curl -fsSL https://get.docker.com | $SUDO sh
+  fi
+
   if [ -n "$SUDO" ] && ! groups "$USER" 2>/dev/null | grep -q '\bdocker\b'; then
     $SUDO usermod -aG docker "$USER" || true
     warn "Added $USER to the docker group — log out/in (or run 'newgrp docker') for it to take effect."
