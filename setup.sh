@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # Bootstraps this project on a fresh machine: installs Docker if missing,
-# generates a .env with a random WEB_UI_PASSWORD if one doesn't exist, then
-# builds and starts the stack (evilginx + gophish, both start by default —
-# gophish's admin container is where the web console's restart/logs
-# features point). Safe to re-run.
+# generates a .env with a random WEB_UI_PASSWORD if one doesn't exist,
+# configures the firewall (Linux/ufw), then builds and starts the stack
+# (evilginx + gophish, both start by default — gophish's admin container is
+# where the web console's restart/logs features point). Safe to re-run.
 #
-# Usage: ./setup.sh
+# Usage: ./setup.sh [--no-firewall]
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+
+SKIP_FIREWALL=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-firewall) SKIP_FIREWALL=1 ;;
+    *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+  esac
+done
 
 log() { printf '\n\033[1;36m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$1" >&2; }
@@ -53,6 +61,39 @@ elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE="docker-compose"
 else
   die "Neither 'docker compose' nor 'docker-compose' is available. Install the Compose plugin: https://docs.docker.com/compose/install/"
+fi
+
+setup_firewall() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    return
+  fi
+  if ! command -v ufw >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      log "Installing ufw"
+      $SUDO apt-get update -qq && $SUDO apt-get install -y -qq ufw
+    else
+      warn "ufw not found and no apt-get to install it — configure your firewall manually (allow SSH, 80/tcp, 443/tcp, 53/udp)."
+      return
+    fi
+  fi
+
+  log "Configuring firewall (ufw): SSH, 80/tcp, 443/tcp, 53/udp"
+  # SSH first, always — enabling ufw before this rule exists can lock you
+  # out of the very box you're running this script on. Falls back to the
+  # raw port in case the 'OpenSSH' app profile isn't registered (happens on
+  # some minimal images) — either way this must succeed before `ufw enable`.
+  $SUDO ufw allow OpenSSH || $SUDO ufw allow 22/tcp
+  $SUDO ufw allow 80/tcp
+  $SUDO ufw allow 443/tcp
+  $SUDO ufw allow 53/udp   # only needed if evilginx is your domain's authoritative nameserver; harmless otherwise
+  $SUDO ufw --force enable
+  $SUDO ufw status
+}
+
+if [ "$SKIP_FIREWALL" -eq 0 ]; then
+  setup_firewall
+else
+  log "Skipping firewall configuration (--no-firewall)"
 fi
 
 if [ ! -f .env ]; then

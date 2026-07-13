@@ -163,13 +163,23 @@ cd ginx
 ./setup.sh
 ```
 
-It installs Docker + the Compose plugin if they're missing (via the
-distro's package manager — apt/dnf/yum, or Docker's convenience script as a
-fallback), generates `.env` with a random `WEB_UI_PASSWORD` if one doesn't
-already exist, then runs `docker compose up -d --build` and prints the access
-URL and password (both Evilginx and Gophish). Safe to re-run — it won't
-overwrite an existing `.env` or touch containers beyond rebuilding/restarting
-them.
+It installs Docker if missing (via Docker's official convenience script),
+installs and configures `ufw` on Linux (allows SSH, 80/tcp, 443/tcp, 53/udp,
+then enables it — pass `--no-firewall` to skip this if you manage firewall
+rules elsewhere, e.g. a cloud provider's security group), generates `.env`
+with a random `WEB_UI_PASSWORD` if one doesn't already exist, then runs
+`docker compose up -d --build` and prints the access URL and password (both
+Evilginx and Gophish). Safe to re-run — it won't overwrite an existing `.env`
+or touch containers beyond rebuilding/restarting them.
+
+The web console and Gophish admin ports are bound to `127.0.0.1` only — reach
+them from your own machine via an SSH tunnel:
+
+```bash
+ssh -L 8080:127.0.0.1:8080 -L 3333:127.0.0.1:3333 youruser@your-vps-ip
+```
+
+then browse to http://127.0.0.1:8080 and https://127.0.0.1:3333 as usual.
 
 ## Notes
 
